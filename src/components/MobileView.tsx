@@ -51,7 +51,36 @@ export default function MobileView({ onSearch, products, isLoading, error, onSwi
         img.onerror = reject;
       });
 
-      const result = await reader.decodeFromImageElement(img);
+      // iOS / High-Res Photo Fix: Downscale via Canvas
+      const MAX_DIMENSION = 1200;
+      let width = img.width;
+      let height = img.height;
+
+      let decodeTarget = img;
+
+      if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+        const ratio = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const resizedImage = new Image();
+          resizedImage.src = canvas.toDataURL('image/jpeg', 0.9);
+          await new Promise((resolve, reject) => {
+            resizedImage.onload = resolve;
+            resizedImage.onerror = reject;
+          });
+          decodeTarget = resizedImage;
+        }
+      }
+
+      const result = await reader.decodeFromImageElement(decodeTarget);
       URL.revokeObjectURL(url);
       
       onSearch(result.getText());
