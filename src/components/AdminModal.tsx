@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { X, Upload, FileSpreadsheet, Lock } from 'lucide-react';
+import { dbService } from '../utils/db';
 
 interface AdminModalProps {
   isOpen: boolean;
@@ -17,27 +18,15 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
 
   if (!isOpen) return null;
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError(null);
-    try {
-      const res = await fetch('/api/admin/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password })
-      });
-      const data = await res.json();
-      
-      if (data.success && data.token) {
-        setToken(data.token);
-      } else {
-        setError(data.message || '관리자 비밀번호가 올바르지 않습니다.');
-      }
-    } catch (err) {
-      setError('네트워크 오류가 발생했습니다.');
-    } finally {
-      setLoading(false);
+    const expectedPassword = import.meta.env.VITE_ADMIN_PASSWORD || '1234';
+    
+    if (password === expectedPassword) {
+      setToken('authenticated');
+    } else {
+      setError('관리자 비밀번호가 올바르지 않습니다.');
     }
   };
 
@@ -49,25 +38,15 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
     setError(null);
     setSuccessMsg(null);
 
-    const formData = new FormData();
-    formData.append('file', file);
-
     try {
-      const res = await fetch('/api/admin/upload-data', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formData
-      });
-      const data = await res.json();
+      const result = await dbService.updateData(file);
       
-      if (data.success) {
-        setSuccessMsg(data.message);
+      if (result.success) {
+        setSuccessMsg(result.message);
       } else {
-        setError(data.message || '데이터를 업데이트하지 못했습니다. 기존 데이터는 유지됩니다.');
-        if (data.errors && data.errors.length > 0) {
-          setError(prev => `${prev}\n\n상세 오류:\n${data.errors.join('\n')}`);
+        setError(result.message || '데이터를 업데이트하지 못했습니다. 기존 데이터는 유지됩니다.');
+        if (result.errors && result.errors.length > 0) {
+          setError(prev => `${prev}\n\n상세 오류:\n${result.errors!.join('\n')}`);
         }
       }
     } catch (err) {

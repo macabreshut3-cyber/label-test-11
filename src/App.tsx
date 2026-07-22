@@ -4,6 +4,7 @@ import MobileView from './components/MobileView';
 import PcView from './components/PcView';
 import AdminModal from './components/AdminModal';
 import { ProductRecord, SearchResponse } from './types';
+import { dbService } from './utils/db';
 
 export default function App() {
   const [isMobile, setIsMobile] = useState(false);
@@ -15,7 +16,9 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check viewport width to determine layout
+    // Seed initial data if needed
+    dbService.seedDataIfEmpty();
+
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
     };
@@ -33,26 +36,16 @@ export default function App() {
     setProducts([]);
 
     try {
-      const res = await fetch(`/api/products/by-barcode/${encodeURIComponent(barcode)}`);
+      const items = await dbService.searchProducts(barcode);
       
-      if (!res.ok) {
-        throw new Error('Network response was not ok');
-      }
-
-      const data: SearchResponse = await res.json();
-      
-      if (data.success) {
-        if (data.count === 0) {
-          setError('등록되지 않은 바코드입니다.');
-        } else {
-          setProducts(data.items);
-        }
+      if (items.length === 0) {
+        setError('등록되지 않은 바코드입니다.');
       } else {
-        setError(data.message || '제품 정보를 조회하지 못했습니다.');
+        setProducts(items);
       }
     } catch (err) {
       console.error(err);
-      setError('제품 정보를 조회하지 못했습니다. 네트워크 연결을 확인해 주세요.');
+      setError('제품 정보를 조회하지 못했습니다.');
     } finally {
       setIsLoading(false);
     }
