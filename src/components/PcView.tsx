@@ -1,7 +1,31 @@
-import React, { useEffect, useRef } from 'react';
-import { Search, Settings, FileImage } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Search, Settings, FileImage, Copy, Check } from 'lucide-react';
 import { ProductRecord } from '../types';
 import { convertUncToFileUrl } from '../utils/link';
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleCopy}
+      title="링크 복사"
+      className="inline-flex items-center justify-center p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-200 rounded-lg transition-colors ml-2"
+    >
+      {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+    </button>
+  );
+}
 
 interface PcViewProps {
   onSearch: (barcode: string) => void;
@@ -9,9 +33,10 @@ interface PcViewProps {
   products: ProductRecord[];
   isLoading: boolean;
   error: string | null;
+  onSwitchToMobile: () => void;
 }
 
-export default function PcView({ onSearch, onOpenAdmin, products, isLoading, error }: PcViewProps) {
+export default function PcView({ onSearch, onOpenAdmin, products, isLoading, error, onSwitchToMobile }: PcViewProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -53,13 +78,21 @@ export default function PcView({ onSearch, onOpenAdmin, products, isLoading, err
           <h2 className="text-2xl font-bold text-gray-900">PC 바코드 조회</h2>
           <p className="text-gray-500 mt-1">USB 바코드 스캐너를 사용하거나 바코드 번호를 입력하세요.</p>
         </div>
-        <button
-          onClick={onOpenAdmin}
-          className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-        >
-          <Settings className="w-4 h-4" />
-          <span>관리자 모드</span>
-        </button>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={onSwitchToMobile}
+            className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+          >
+            <span>모바일 화면으로</span>
+          </button>
+          <button
+            onClick={onOpenAdmin}
+            className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+          >
+            <Settings className="w-4 h-4" />
+            <span>관리자 모드</span>
+          </button>
+        </div>
       </div>
 
       <div className="flex space-x-4 mb-8">
@@ -114,15 +147,18 @@ export default function PcView({ onSearch, onOpenAdmin, products, isLoading, err
                   <td className="px-6 py-4 text-gray-700">{product.productName}</td>
                   <td className="px-6 py-4">
                     {product.link ? (
-                      <a
-                        href={convertUncToFileUrl(product.link)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
-                      >
-                        <FileImage className="w-4 h-4 mr-2" />
-                        시안보기
-                      </a>
+                      <div className="flex items-center">
+                        <a
+                          href={convertUncToFileUrl(product.link)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                        >
+                          <FileImage className="w-4 h-4 mr-2" />
+                          시안보기
+                        </a>
+                        <CopyButton text={product.link} />
+                      </div>
                     ) : (
                       <span className="text-gray-400 text-sm">링크 없음</span>
                     )}

@@ -7,6 +7,7 @@ import { ProductRecord, SearchResponse } from './types';
 
 export default function App() {
   const [isMobile, setIsMobile] = useState(false);
+  const [manualView, setManualView] = useState<'mobile' | 'pc' | null>(null);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   
   const [products, setProducts] = useState<ProductRecord[]>([]);
@@ -57,6 +58,8 @@ export default function App() {
     }
   };
 
+  const showMobileView = manualView === 'mobile' || (isMobile && manualView !== 'pc');
+
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-900 selection:bg-blue-100">
       <header className="bg-white border-b border-gray-200">
@@ -71,12 +74,13 @@ export default function App() {
       </header>
 
       <main>
-        {isMobile ? (
+        {showMobileView ? (
           <MobileView 
             onSearch={handleSearch} 
             products={products} 
             isLoading={isLoading} 
             error={error} 
+            onSwitchToPc={() => setManualView('pc')}
           />
         ) : (
           <PcView 
@@ -85,6 +89,7 @@ export default function App() {
             products={products} 
             isLoading={isLoading} 
             error={error} 
+            onSwitchToMobile={() => setManualView('mobile')}
           />
         )}
       </main>

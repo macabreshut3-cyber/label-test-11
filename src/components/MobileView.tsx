@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Camera, Image as ImageIcon } from 'lucide-react';
+import { Camera, Image as ImageIcon, Monitor } from 'lucide-react';
 import { ProductRecord } from '../types';
 import { BrowserMultiFormatReader } from '@zxing/library';
 
@@ -8,9 +8,10 @@ interface MobileViewProps {
   products: ProductRecord[];
   isLoading: boolean;
   error: string | null;
+  onSwitchToPc: () => void;
 }
 
-export default function MobileView({ onSearch, products, isLoading, error }: MobileViewProps) {
+export default function MobileView({ onSearch, products, isLoading, error, onSwitchToPc }: MobileViewProps) {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -103,6 +104,14 @@ export default function MobileView({ onSearch, products, isLoading, error }: Mob
           <span className="text-gray-900 font-medium">갤러리에서 선택</span>
         </button>
       </div>
+      
+      <button
+        onClick={onSwitchToPc}
+        className="flex items-center justify-center w-full p-4 mt-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-medium"
+      >
+        <Monitor className="w-5 h-5 mr-2 text-gray-600" />
+        PC 화면으로 전환하기
+      </button>
 
       {(error || localError) && (
         <div className="w-full p-4 bg-red-50 text-red-700 border border-red-100 rounded-xl text-sm text-center">
