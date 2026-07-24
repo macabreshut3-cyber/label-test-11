@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Camera, Image as ImageIcon, Monitor } from 'lucide-react';
 import { ProductRecord } from '../types';
-import { BrowserMultiFormatReader } from '@zxing/library';
+import { BrowserMultiFormatReader, DecodeHintType } from '@zxing/library';
 
 interface MobileViewProps {
   onSearch: (barcode: string) => void;
@@ -22,15 +22,23 @@ export default function MobileView({ onSearch, products, isLoading, error, onSwi
 
     setLocalError(null);
 
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+
     try {
-      // 1. Try Native BarcodeDetector (Chrome/Android)
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = url;
+      });
+
+      // 1. Try Native BarcodeDetector (Chrome/Android/iOS 17+)
       if ('BarcodeDetector' in window) {
         try {
           const detector = new (window as any).BarcodeDetector({
             formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'itf']
           });
-          const bitmap = await createImageBitmap(file);
-          const barcodes = await detector.detect(bitmap);
+          const barcodes = await detector.detect(img);
           if (barcodes.length > 0) {
             onSearch(barcodes[0].rawValue);
             return;
@@ -41,55 +49,83 @@ export default function MobileView({ onSearch, products, isLoading, error, onSwi
       }
 
       // 2. Fallback to ZXing
-      const reader = new BrowserMultiFormatReader();
-      const url = URL.createObjectURL(file);
-      const img = new Image();
-      img.src = url;
+      const hints = new Map();
+      hints.set(DecodeHintType.TRY_HARDER, true);
+      const reader = new BrowserMultiFormatReader(hints);
       
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-      });
+      // Try 2.1: Original Image
+      try {
+        const result = await reader.decodeFromImageElement(img);
+        onSearch(result.getText());
+        return;
+      } catch (err) {
+        console.warn('ZXing original image failed, trying resized/processed...', err);
+      }
 
-      // iOS / High-Res Photo Fix: Downscale via Canvas
+      // Try 2.2: iOS / High-Res Photo Fix: Downscale via Canvas
       const MAX_DIMENSION = 1200;
       let width = img.width;
       let height = img.height;
 
-      let decodeTarget = img;
+      const ratio = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height);
+      width = Math.round(width * ratio);
+      height = Math.round(height * ratio);
 
-      if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
-        const ratio = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height);
-        width = Math.round(width * ratio);
-        height = Math.round(height * ratio);
-
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) throw new Error('Canvas not supported');
         
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          const resizedImage = new Image();
-          resizedImage.src = canvas.toDataURL('image/jpeg', 0.9);
-          await new Promise((resolve, reject) => {
-            resizedImage.onload = resolve;
-            resizedImage.onerror = reject;
-          });
-          decodeTarget = resizedImage;
-        }
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+      
+      const resizedImage = new Image();
+      resizedImage.src = canvas.toDataURL('image/jpeg', 0.9);
+      await new Promise((resolve, reject) => {
+        resizedImage.onload = resolve;
+        resizedImage.onerror = reject;
+      });
+      
+      try {
+        const result = await reader.decodeFromImageElement(resizedImage);
+        onSearch(result.getText());
+        return;
+      } catch (err) {
+        console.warn('ZXing resized image failed, trying rotated...', err);
       }
 
-      const result = await reader.decodeFromImageElement(decodeTarget);
-      URL.revokeObjectURL(url);
-      
-      onSearch(result.getText());
+      // Try 2.3: Rotate the image by 90 degrees
+      canvas.width = height; // swapped
+      canvas.height = width;
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate(Math.PI / 2);
+      ctx.drawImage(resizedImage, -width / 2, -height / 2, width, height);
+
+      const rotatedImage = new Image();
+      rotatedImage.src = canvas.toDataURL('image/jpeg', 0.9);
+      await new Promise((resolve, reject) => {
+        rotatedImage.onload = resolve;
+        rotatedImage.onerror = reject;
+      });
+
+      try {
+        const result = await reader.decodeFromImageElement(rotatedImage);
+        onSearch(result.getText());
+        return;
+      } catch (err) {
+        throw new Error('All decoding attempts failed.');
+      }
 
     } catch (err) {
       console.error('Barcode reading failed:', err);
-      setLocalError('이미지에서 바코드를 인식하지 못했습니다. 바코드가 선명하게 보이도록 다시 촬영해 주세요.');
+      setLocalError('이미지에서 바코드를 인식하지 못했습니다. 바코드가 가로 방향으로 선명하게 보이도록 다시 촬영해 주세요.');
     } finally {
-      // Reset input so the same file can be selected again
+      URL.revokeObjectURL(url);
       e.target.value = '';
     }
   };
