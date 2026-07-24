@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Search, Settings, FileImage, Copy, Check } from 'lucide-react';
 import { ProductRecord } from '../types';
-import { convertUncToFileUrl } from '../utils/link';
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -148,15 +147,24 @@ export default function PcView({ onSearch, onOpenAdmin, products, isLoading, err
                   <td className="px-6 py-4">
                     {product.link ? (
                       <div className="flex items-center">
-                        <a
-                          href={convertUncToFileUrl(product.link)}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          onClick={() => {
+                            const trimmed = product.link.trim();
+                            if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+                              window.open(trimmed, '_blank');
+                              return;
+                            }
+                            navigator.clipboard.writeText(trimmed).then(() => {
+                              alert(`웹 브라우저 보안 정책상 파일 탐색기를 직접 열 수 없습니다.\n\n경로가 클립보드에 복사되었으니:\n1. 파일 탐색기(Win + E)를 엽니다.\n2. 주소창에 붙여넣기(Ctrl + V) 한 후 Enter를 누르세요.\n\n복사된 경로: ${trimmed}`);
+                            }).catch(() => {
+                              alert(`파일 경로: ${trimmed}\n(브라우저에서 직접 열 수 없는 경로입니다. 복사하여 탐색기에서 열어주세요.)`);
+                            });
+                          }}
                           className="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
                         >
                           <FileImage className="w-4 h-4 mr-2" />
                           시안보기
-                        </a>
+                        </button>
                         <CopyButton text={product.link} />
                       </div>
                     ) : (
